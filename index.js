@@ -180,6 +180,39 @@ async function run() {
         }
         );
 
+        app.get("/pending-assignments", async (req, res) => {
+
+            const assignments = await submitedAssignmentDatabase
+                .aggregate([
+                    { $match: { status: {$ne:"completed"} } },
+                    { $addFields: { assignmentId: { $toObjectId: "$assignmentId" } } },
+                    {
+                        $lookup: {
+                            from: "assignments",
+                            localField: "assignmentId",
+                            foreignField: "_id",
+                            as: "assignmentDetails",
+                        },
+                    },
+                ]).toArray();
+
+            if (!assignments || assignments.length === 0) {
+                return res.status(404).send({
+                    success: false,
+                    message: "No pending assignments found ",
+                    data: [],
+                });
+            }
+
+            res.status(200).send({
+                success: true,
+                message: "Assignments retrieved successfully",
+                data: assignments,
+            });
+
+        }
+        );
+
         // update mark and status
         app.patch("/assgnment-mark/:email/:id", async (req, res) => {
             const { email, id } = req?.params;
@@ -195,7 +228,7 @@ async function run() {
             }
 
             // Check valid user
-            if (updatedData?.createdBy?.email == email) {
+            if (updatedData?.submittedBy == email) {
                 return res.status(403).send({
                     success: false,
                     message: "You can't marked on your own assignment",
